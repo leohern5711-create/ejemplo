@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulación de Tanque de Agua</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: rgba(56,138,221,0.2);
+    --accent: #378ADD;
+    --accent2: #1D9E75;
+    --accent3: #D85A30;
+    --accent4: #7F77DD;
+    --text: #e8edf5;
+    --muted: #6b7a99;
+    --glow: rgba(55,138,221,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(55,138,221,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(55,138,221,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+
+  /* Header */
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 14px;
+    margin-bottom: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  header h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #e8edf5 0%, var(--accent) 60%, var(--accent4) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: .5rem;
+  }
+  header p {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* Main grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  /* Panel cards */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .panel-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  /* Tank visualization */
+  .tank-panel { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+
+  #tank-svg { width: 100%; max-width: 220px; }
+
+  /* Params list */
+  .params { width: 100%; }
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
+  .param-row:last-child { border-bottom: none; }
+  .param-row span:first-child { color: var(--muted); }
+  .param-row span:last-child { color: var(--text); font-weight: 700; }
+
+  /* Right panel */
+  .right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+  .metric {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .metric:hover { border-color: rgba(56,138,221,0.5); }
+  .metric-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .metric-unit { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .m-time .metric-value { color: var(--accent); }
+  .m-h    .metric-value { color: var(--accent2); }
+  .m-v    .metric-value { color: var(--accent3); }
+  .m-p    .metric-value { color: var(--accent4); }
+
+  /* Progress bar */
+  .progress-wrap { margin-top: .5rem; }
+  .progress-bar-bg {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent4));
+    border-radius: 2px;
+    width: 0%;
+    transition: width .1s linear;
+  }
+  .progress-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  /* Charts grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .chart-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .chart-card-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chart-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .chart-card canvas { display: block; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: 0.05em;
+  }
+  .btn:hover { background: var(--glow); border-color: var(--accent); color: var(--accent); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #2a70c0; color: #fff; border-color: #2a70c0; }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  #speed-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 28px;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 12px;
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    transition: background .3s;
+  }
+  .status-dot.active { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .status-dot.done { background: var(--accent3); }
+
+  @media (max-width: 768px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="tag">⚗ Dinámica de Fluidos · Torricelli</div>
+    <h1>Simulación de Tanque de Agua</h1>
+    <p>Vaciado cilíndrico · R=41cm · r=1.6cm · h₀=1m · T=4:56.49</p>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- Left: Tank -->
+    <div class="panel tank-panel">
+      <div class="panel-title">// visualización 3d</div>
+
+      <svg id="tank-svg" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+        <!-- Tank shell -->
+        <defs>
+          <linearGradient id="shellGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1e2d47"/>
+            <stop offset="40%" stop-color="#2a3f5f"/>
+            <stop offset="100%" stop-color="#1a2535"/>
+          </linearGradient>
+          <clipPath id="waterClip">
+            <rect x="22" y="20" width="156" height="188" rx="2"/>
+          </clipPath>
+        </defs>
+
+        <!-- Tank body -->
+        <rect x="18" y="18" width="164" height="192" rx="8" fill="url(#shellGrad)" stroke="#378ADD" stroke-width="1.5" stroke-opacity="0.4"/>
+
+        <!-- Water -->
+        <rect id="water-rect" x="22" y="22" width="156" height="184" rx="4" fill="#1a4a7a" clip-path="url(#waterClip)"/>
+        <!-- Water surface shimmer -->
+        <rect id="water-surface" x="22" width="156" height="4" rx="2" fill="#378ADD" opacity="0.6"/>
+
+        <!-- R label -->
+        <line x1="100" y1="10" x2="182" y2="10" stroke="#378ADD" stroke-width="1" stroke-dasharray="3,2" opacity="0.5"/>
+        <text x="140" y="8" font-family="Space Mono, monospace" font-size="10" fill="#378ADD" text-anchor="middle" opacity="0.8">R = 41 cm</text>
+
+        <!-- h label -->
+        <line x1="8" y1="22" x2="8" y2="206" stroke="#1D9E75" stroke-width="1" opacity="0.6"/>
+        <polygon points="8,20 5,28 11,28" fill="#1D9E75" opacity="0.6"/>
+        <polygon points="8,208 5,200 11,200" fill="#1D9E75" opacity="0.6"/>
+        <text id="h-label" x="4" y="116" font-family="Space Mono, monospace" font-size="9" fill="#1D9E75" text-anchor="middle" transform="rotate(-90,4,116)">h=1.000 m</text>
+
+        <!-- Legs -->
+        <rect x="30" y="210" width="12" height="40" rx="3" fill="#1e2d47" stroke="#378ADD" stroke-width="0.8" stroke-opacity="0.3"/>
+        <rect x="158" y="210" width="12" height="40" rx="3" fill="#1e2d47" stroke="#378ADD" stroke-width="0.8" stroke-opacity="0.3"/>
+        <rect x="70" y="210" width="12" height="40" rx="3" fill="#1e2d47" stroke="#378ADD" stroke-width="0.8" stroke-opacity="0.3"/>
+        <rect x="118" y="210" width="12" height="40" rx="3" fill="#1e2d47" stroke="#378ADD" stroke-width="0.8" stroke-opacity="0.3"/>
+
+        <!-- Orifice -->
+        <ellipse cx="100" cy="210" rx="10" ry="4" fill="#0a0e1a" stroke="#378ADD" stroke-width="1.2" stroke-opacity="0.6"/>
+        <text x="120" y="213" font-family="Space Mono, monospace" font-size="9" fill="#6b7a99">r=1.6cm</text>
+
+        <!-- Jet -->
+        <g id="jet-group">
+          <line x1="100" y1="214" x2="98" y2="235" stroke="#378ADD" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+          <line x1="100" y1="214" x2="102" y2="240" stroke="#85B7EB" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <line x1="100" y1="219" x2="97" y2="248" stroke="#378ADD" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+          <line x1="100" y1="219" x2="103" y2="252" stroke="#85B7EB" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+        </g>
+      </svg>
+
+      <!-- Parameters -->
+      <div class="params">
+        <div class="panel-title">// parámetros</div>
+        <div class="param-row"><span>Radio tanque R</span><span>0.41 m</span></div>
+        <div class="param-row"><span>Radio orificio r</span><span>0.016 m</span></div>
+        <div class="param-row"><span>Altura inicial h₀</span><span>1.000 m</span></div>
+        <div class="param-row"><span>Área tanque A</span><span>0.5281 m²</span></div>
+        <div class="param-row"><span>Área orificio a</span><span>8.04×10⁻⁴ m²</span></div>
+        <div class="param-row"><span>A/a</span><span>657.0</span></div>
+        <div class="param-row"><span>g</span><span>9.81 m/s²</span></div>
+        <div class="param-row"><span>ρ agua</span><span>998 kg/m³</span></div>
+        <div class="param-row"><span>Tiempo total</span><span>4:56.49</span></div>
+      </div>
+    </div>
+
+    <!-- Right: metrics + charts + controls -->
+    <div class="right-col">
+
+      <!-- Status -->
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="status-badge">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Listo</span>
+        </div>
+        <div class="progress-wrap" style="flex:1;">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="prog-fill"></div>
+          </div>
+          <div class="progress-label">
+            <span>Vaciado</span>
+            <span id="prog-pct">0.0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="panel" style="padding:1rem;">
+        <div class="metrics">
+          <div class="metric m-time">
+            <div class="metric-label">Tiempo</div>
+            <div class="metric-value" id="c-time">0:00.00</div>
+            <div class="metric-unit">mm:ss</div>
+          </div>
+          <div class="metric m-h">
+            <div class="metric-label">Altura h</div>
+            <div class="metric-value" id="c-h">1.000</div>
+            <div class="metric-unit">metros</div>
+          </div>
+          <div class="metric m-v">
+            <div class="metric-label">Velocidad</div>
+            <div class="metric-value" id="c-v">4.429</div>
+            <div class="metric-unit">m/s</div>
+          </div>
+          <div class="metric m-p">
+            <div class="metric-label">Presión fondo</div>
+            <div class="metric-value" id="c-p">9790</div>
+            <div class="metric-unit">Pa</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="panel" style="padding:1rem;">
+        <div class="panel-title">// gráficas en tiempo real</div>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-card-title">
+              <span class="chart-dot" style="background:#378ADD;"></span>
+              Altura h(t) — m
+            </div>
+            <div style="position:relative;height:120px;"><canvas id="ch-chart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">
+              <span class="chart-dot" style="background:#D85A30;"></span>
+              Velocidad v(t) — m/s
+            </div>
+            <div style="position:relative;height:120px;"><canvas id="cv-chart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">
+              <span class="chart-dot" style="background:#7F77DD;"></span>
+              Presión P(t) — Pa
+            </div>
+            <div style="position:relative;height:120px;"><canvas id="cp-chart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">
+              <span class="chart-dot" style="background:#1D9E75;"></span>
+              Vaciado (%)
+            </div>
+            <div style="position:relative;height:120px;"><canvas id="cprog-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="panel" style="padding:1rem;">
+        <div class="controls">
+          <button class="btn btn-primary" id="btn-play">▶ Iniciar</button>
+          <button class="btn" id="btn-reset">↺ Reiniciar</button>
+          <div class="speed-ctrl">
+            <label>Velocidad</label>
+            <input type="range" id="speed-range" min="1" max="20" value="5" step="1">
+            <span id="speed-val">5×</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const R = 0.41, r = 0.016, H = 1.0, g = 9.81;
+const T_total = 4*60 + 56.49;
+const k_adj = (2 * Math.sqrt(H)) / T_total;
+
+function h_at(t) {
+  const val = Math.sqrt(H) - (k_adj / 2) * t;
+  return Math.max(0, val * val);
+}
+function v_at(h) { return Math.sqrt(2 * g * h); }
+function p_at(h) { return 998 * g * h; }
+
+const N = 120;
+const times = Array.from({length: N+1}, (_,i) => i * T_total / N);
+const h_data = times.map(h_at);
+const v_data = h_data.map(v_at);
+const p_data = h_data.map(p_at);
+const prog_data = h_data.map(h => (1 - h/H) * 100);
+const t_labels = times.map(t => (t/60).toFixed(1));
+
+const chartDefs = [
+  { id: 'ch-chart',   data: h_data,    color: '#378ADD', unit: 'm'   },
+  { id: 'cv-chart',   data: v_data,    color: '#D85A30', unit: 'm/s' },
+  { id: 'cp-chart',   data: p_data,    color: '#7F77DD', unit: 'Pa'  },
+  { id: 'cprog-chart',data: prog_data, color: '#1D9E75', unit: '%'   },
+];
+
+const charts = chartDefs.map(({ id, data, color, unit }) =>
+  new Chart(document.getElementById(id), {
+    type: 'line',
+    data: {
+      labels: t_labels,
+      datasets: [
+        {
+          data: data,
+          borderColor: color,
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true,
+          backgroundColor: color + '1a',
+          tension: 0.35
+        },
+        {
+          data: [],
+          borderColor: '#e24b4a',
+          borderWidth: 0,
+          pointRadius: 5,
+          pointBackgroundColor: '#e24b4a',
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ctx.parsed.y.toFixed(3) + ' ' + unit }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 5, font: { size: 9 }, color: '#6b7a99' },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.08)' }
+        },
+        y: {
+          ticks: { font: { size: 9 }, color: '#6b7a99', callback: v => parseFloat(v).toFixed(id === 'cp-chart' ? 0 : 1) },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.08)' }
+        }
+      }
+    }
+  })
+);
+
+function updateChartIndicator(chart, idx) {
+  const d = chart.data.datasets[0].data;
+  const nullArr = new Array(d.length).fill(null);
+  nullArr[idx] = d[idx];
+  chart.data.datasets[1].data = nullArr;
+  chart.update('none');
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m + ':' + sec.toFixed(2).padStart(5, '0');
+}
+
+function updateUI(t) {
+  const h = h_at(t);
+  const v = v_at(h);
+  const p = p_at(h);
+  const done = h <= 0.0001;
+  const pct = (1 - h / H) * 100;
+
+  document.getElementById('c-time').textContent = fmtTime(Math.min(t, T_total));
+  document.getElementById('c-h').textContent = h.toFixed(3);
+  document.getElementById('c-v').textContent = v.toFixed(3);
+  document.getElementById('c-p').textContent = Math.round(p);
+
+  document.getElementById('prog-fill').style.width = pct.toFixed(1) + '%';
+  document.getElementById('prog-pct').textContent = pct.toFixed(1) + '%';
+
+  // Tank water
+  const waterH = Math.max(0, h / H * 184);
+  const wr = document.getElementById('water-rect');
+  wr.setAttribute('y', (206 - waterH).toFixed(1));
+  wr.setAttribute('height', waterH.toFixed(1));
+
+  const ws = document.getElementById('water-surface');
+  ws.setAttribute('y', (206 - waterH).toFixed(1));
+  ws.setAttribute('width', '156');
+
+  document.getElementById('h-label').textContent = 'h=' + h.toFixed(3) + ' m';
+
+  // Jet opacity
+  const jetO = done ? 0 : Math.min(1, v / 4.43);
+  document.getElementById('jet-group').setAttribute('opacity', jetO.toFixed(2));
+
+  // Charts
+  const idx = Math.min(N, Math.round(t / T_total * N));
+  charts.forEach(c => updateChartIndicator(c, idx));
+}
+
+let simT = 0, running = false, animId = null, lastTs = null;
+
+const speedRange = document.getElementById('speed-range');
+speedRange.oninput = () => {
+  document.getElementById('speed-val').textContent = speedRange.value + '×';
+};
+
+document.getElementById('btn-play').onclick = () => {
+  const dot = document.getElementById('status-dot');
+  const stxt = document.getElementById('status-text');
+  if (!running) {
+    if (simT >= T_total) simT = 0;
+    running = true;
+    lastTs = null;
+    document.getElementById('btn-play').textContent = '⏸ Pausar';
+    dot.className = 'status-dot active';
+    stxt.textContent = 'Simulando...';
+    animId = requestAnimationFrame(step);
+  } else {
+    running = false;
+    cancelAnimationFrame(animId);
+    document.getElementById('btn-play').textContent = '▶ Continuar';
+    dot.className = 'status-dot';
+    stxt.textContent = 'Pausado';
+  }
+};
+
+document.getElementById('btn-reset').onclick = () => {
+  running = false;
+  cancelAnimationFrame(animId);
+  simT = 0;
+  lastTs = null;
+  document.getElementById('btn-play').textContent = '▶ Iniciar';
+  document.getElementById('status-dot').className = 'status-dot';
+  document.getElementById('status-text').textContent = 'Listo';
+  updateUI(0);
+};
+
+function step(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = (ts - lastTs) / 1000 * parseFloat(speedRange.value);
+  lastTs = ts;
+  simT = Math.min(simT + dt, T_total);
+  updateUI(simT);
+  if (simT < T_total) {
+    animId = requestAnimationFrame(step);
+  } else {
+    running = false;
+    document.getElementById('btn-play').textContent = '▶ Reiniciar';
+    document.getElementById('status-dot').className = 'status-dot done';
+    document.getElementById('status-text').textContent = '¡Vaciado completo!';
+  }
+}
+
+updateUI(0);
+</script>
+</body>
+</html>
